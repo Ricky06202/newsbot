@@ -16,11 +16,17 @@ sqlite.exec(`
     title TEXT NOT NULL,
     url TEXT,
     summary TEXT,
+    image TEXT,
+    author TEXT,
     source TEXT,
     severity TEXT,
     published INTEGER,
     fetched_at INTEGER NOT NULL
   );
 `);
+
+// Migración: agregar columnas nuevas si faltan
+try { sqlite.exec("ALTER TABLE items ADD COLUMN image TEXT"); } catch {}
+try { sqlite.exec("ALTER TABLE items ADD COLUMN author TEXT"); } catch {}
 
 export { sqlite, DB_PATH };

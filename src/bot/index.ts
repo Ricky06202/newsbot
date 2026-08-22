@@ -36,20 +36,37 @@ function isNew(url: string): boolean {
   return !row;
 }
 
-function markSeen(url: string, type: string, title: string, summary: string, source: string, severity: string | null, published?: number) {
+function markSeen(url: string, type: string, title: string, summary: string, source: string, severity: string | null, published?: number, image?: string, author?: string) {
   sqlite.query(
-    `INSERT OR IGNORE INTO items (id, type, title, url, summary, source, severity, published, fetched_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(itemHash(url), type, title, url, summary, source, severity, published ?? null, Date.now());
+    `INSERT OR IGNORE INTO items (id, type, title, url, summary, image, author, source, severity, published, fetched_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(itemHash(url), type, title, url, summary, image ?? null, author ?? null, source, severity, published ?? null, Date.now());
 }
 
 function newsEmbed(item: any) {
-  return new EmbedBuilder()
+  const embed = new EmbedBuilder()
     .setTitle(item.title.substring(0, 256))
     .setURL(item.url)
     .setColor(0x3498db)
-    .setFooter({ text: `📰 ${item.source}` })
     .setTimestamp(item.published ? new Date(item.published) : new Date());
+
+  const isHN = item.source === "Hacker News";
+  if (isHN) {
+    // HN: mostrar puntos/comentarios, no el snippet que es puro URL
+    const stats = [item.points ? `⬆️ ${item.points} pts` : "", item.comments ? `💬 ${item.comments}` : ""].filter(Boolean).join(" • ");
+    embed.setFooter({ text: `📰 Hacker News${stats ? ` • ${stats}` : ""}` });
+  } else {
+    if (item.summary) {
+      embed.setDescription(item.summary.substring(0, 400));
+    }
+    embed.setFooter({ text: `📰 ${item.source}${item.author ? ` • ✍️ ${item.author}` : ""}` });
+  }
+
+  if (item.image) {
+    embed.setImage(item.image);
+  }
+
+  return embed;
 }
 
 const CVS_COLORS: Record<string, number> = {
@@ -83,7 +100,7 @@ async function autoFetch(client: Client) {
       let sent = 0;
       for (const item of items) {
         if (!isNew(item.url)) continue;
-        markSeen(item.url, "news", item.title, item.summary, item.source, null, item.published);
+        markSeen(item.url, "news", item.title, item.summary, item.source, null, item.published, item.image, item.author);
         await newsChannel.send({ embeds: [newsEmbed(item)] });
         sent++;
         if (sent >= 5) break;
