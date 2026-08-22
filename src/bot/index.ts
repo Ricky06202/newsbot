@@ -78,12 +78,18 @@ const CVS_COLORS: Record<string, number> = {
 };
 
 function cveEmbed(item: any) {
-  return new EmbedBuilder()
-    .setTitle(item.title.substring(0, 256))
+  const embed = new EmbedBuilder()
+    .setTitle(item.id)
     .setURL(item.url)
     .setColor(CVS_COLORS[item.severity] || 0x95a5a6)
     .setFooter({ text: `🔴 ${item.severity} • ${item.source}` })
     .setTimestamp(item.published ? new Date(item.published) : new Date());
+
+  if (item.summary) {
+    embed.setDescription(item.summary.substring(0, 1000));
+  }
+
+  return embed;
 }
 
 // ─── Auto-fetch ───
