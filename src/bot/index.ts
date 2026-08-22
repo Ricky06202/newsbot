@@ -77,18 +77,22 @@ async function autoFetch(client: Client) {
 
   // News
   if (newsChannel && "send" in newsChannel) {
-    const { fetchNews } = await import("../fetcher/news");
-    const items = await fetchNews();
-    let sent = 0;
-    for (const item of items) {
-      if (!isNew(item.url)) continue;
-      markSeen(item.url, "news", item.title, item.summary, item.source, null, item.published);
-      await newsChannel.send({ embeds: [newsEmbed(item)] });
-      sent++;
-      if (sent >= 5) break;
+    try {
+      const { fetchNews } = await import("../fetcher/news");
+      const items = await fetchNews();
+      let sent = 0;
+      for (const item of items) {
+        if (!isNew(item.url)) continue;
+        markSeen(item.url, "news", item.title, item.summary, item.source, null, item.published);
+        await newsChannel.send({ embeds: [newsEmbed(item)] });
+        sent++;
+        if (sent >= 5) break;
+      }
+      if (sent > 0) console.log(chalk.green(`  ✓ ${sent} noticias nuevas`));
+      else console.log(chalk.dim("  Sin noticias nuevas"));
+    } catch (err: any) {
+      console.error(chalk.red(`  ✗ News send failed: ${err.message}`));
     }
-    if (sent > 0) console.log(chalk.green(`  ✓ ${sent} noticias nuevas`));
-    else console.log(chalk.dim("  Sin noticias nuevas"));
   }
 
   // CVEs
