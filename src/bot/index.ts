@@ -15,12 +15,14 @@ import { createHash } from "crypto";
 const TOKEN = process.env.NEWSBOT_DISCORD_TOKEN!;
 const CLIENT_ID = process.env.NEWSBOT_CLIENT_ID!;
 const CHANNEL_NEWS = process.env.NEWSBOT_CHANNEL_NEWS!;
+const CHANNEL_SECURITY = process.env.NEWSBOT_CHANNEL_SECURITY!;
 const CHANNEL_CVES = process.env.NEWSBOT_CHANNEL_CVES!;
 const FETCH_INTERVAL_MS = 30 * 60 * 1000;
 
 // ─── Commands ───
 const commands = [
   new SlashCommandBuilder().setName("news").setDescription("Últimas noticias tech (top 5)"),
+  new SlashCommandBuilder().setName("seguridad").setDescription("Últimas noticias de seguridad (top 5)"),
   new SlashCommandBuilder().setName("cves").setDescription("Últimos CVEs del stack (top 5)"),
   new SlashCommandBuilder().setName("newsbot").setDescription("Cómo funciona este bot"),
 ];
@@ -97,23 +99,28 @@ function cveEmbed(item: any) {
 async function autoFetch(client: Client) {
   console.log(chalk.dim("  Auto-fetching..."));
   const newsChannel = client.channels.cache.get(CHANNEL_NEWS);
+  const securityChannel = client.channels.cache.get(CHANNEL_SECURITY);
   const cveChannel = client.channels.cache.get(CHANNEL_CVES);
 
-  // News
-  if (newsChannel && "send" in newsChannel) {
+  // News + Security
+  if ((newsChannel && "send" in newsChannel) || (securityChannel && "send" in securityChannel)) {
     try {
       const { fetchNews } = await import("../fetcher/news");
       const items = await fetchNews();
-      let sent = 0;
+      let sentNews = 0;
+      let sentSec = 0;
       for (const item of items) {
+        const target = item.type === "security" ? securityChannel : newsChannel;
+        if (!target || !("send" in target)) continue;
         if (!isNew(item.url)) continue;
-        markSeen(item.url, "news", item.title, item.summary, item.source, null, item.published, item.image, item.author);
-        await newsChannel.send({ embeds: [newsEmbed(item)] });
-        sent++;
-        if (sent >= 5) break;
+        markSeen(item.url, item.type, item.title, item.summary, item.source, null, item.published, item.image, item.author);
+        await target.send({ embeds: [newsEmbed(item)] });
+        if (item.type === "security") sentSec++;
+        else sentNews++;
       }
-      if (sent > 0) console.log(chalk.green(`  ✓ ${sent} noticias nuevas`));
+      if (sentNews > 0) console.log(chalk.green(`  ✓ ${sentNews} noticias nuevas`));
       else console.log(chalk.dim("  Sin noticias nuevas"));
+      if (sentSec > 0) console.log(chalk.green(`  ✓ ${sentSec} noticias de seguridad nuevas`));
     } catch (err: any) {
       console.error(chalk.red(`  ✗ News send failed: ${err.message}`));
     }
@@ -153,6 +160,18 @@ async function handleNews(interaction: ChatInputCommandInteraction) {
   await interaction.editReply({ content: "📰 **Últimas noticias:**", embeds: rows.map(newsEmbed) });
 }
 
+async function handleSeguridad(interaction: ChatInputCommandInteraction) {
+  await interaction.deferReply();
+  const rows = sqlite.query(
+    "SELECT * FROM items WHERE type = 'security' ORDER BY published DESC LIMIT 5"
+  ).all();
+  if (rows.length === 0) {
+    await interaction.editReply("Todavía no hay noticias de seguridad. Espera el próximo auto-fetch.");
+    return;
+  }
+  await interaction.editReply({ content: "🛡️ **Últimas noticias de seguridad:**", embeds: rows.map(newsEmbed) });
+}
+
 async function handleCves(interaction: ChatInputCommandInteraction) {
   await interaction.deferReply();
   const rows = sqlite.query(
@@ -181,6 +200,14 @@ async function handleInfo(interaction: ChatInputCommandInteraction) {
         ].join("\n"),
       },
       {
+        name: "🛡️ Noticias de seguridad",
+        value: [
+          "• The Hacker News",
+          "• Bleeping Computer",
+          "Filtraciones, ransomware y brechas de datos.",
+        ].join("\n"),
+      },
+      {
         name: "🔴 Vulnerabilidades (CVE)",
         value: [
           "Uso la API oficial de NVD (NIST).",
@@ -193,6 +220,7 @@ async function handleInfo(interaction: ChatInputCommandInteraction) {
         name: "⚙️ Comandos",
         value: [
           "`/news` — Últimas noticias",
+          "`/seguridad` — Últimas noticias de seguridad",
           "`/cves` — Últimos CVEs",
           "`/newsbot` — Esta información",
         ].join("\n"),
@@ -232,6 +260,7 @@ async function main() {
     try {
       switch (interaction.commandName) {
         case "news": await handleNews(interaction); break;
+        case "seguridad": await handleSeguridad(interaction); break;
         case "cves": await handleCves(interaction); break;
         case "newsbot": await handleInfo(interaction); break;
       }

@@ -7,7 +7,7 @@ const parser = new Parser({
 });
 
 interface NewsItem {
-  type: "news";
+  type: "news" | "security";
   title: string;
   url: string;
   summary: string;
@@ -20,6 +20,7 @@ interface NewsItem {
 interface NewsSource {
   name: string;
   url: string;
+  type?: "news" | "security"; // default "news"
   keywords?: string[]; // si está, solo deja items que matcheen alguna keyword
 }
 
@@ -57,6 +58,17 @@ const NEWS_SOURCES: NewsSource[] = [
     name: "freeCodeCamp",
     url: "https://www.freecodecamp.org/news/rss/",
     keywords: ["react", "typescript", "javascript", "python", "rust", "go", "node", "bash", "linux", "sql", "postgres"],
+  },
+  // ─── Seguridad ───
+  {
+    name: "The Hacker News",
+    url: "https://feeds.feedburner.com/TheHackersNews",
+    type: "security",
+  },
+  {
+    name: "Bleeping Computer",
+    url: "https://www.bleepingcomputer.com/feed/",
+    type: "security",
   },
 ];
 
@@ -133,7 +145,7 @@ export async function fetchNews(): Promise<NewsItem[]> {
           const snippet = (item.contentSnippet || stripHtml(contentHtml) || "").substring(0, 300);
           const isHN = source.name === "Hacker News";
           return {
-            type: "news" as const,
+            type: (source.type || "news") as "news" | "security",
             title: cleanTitle(item.title || ""),
             url: item.link || "",
             summary: snippet,
