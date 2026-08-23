@@ -50,17 +50,18 @@ function newsEmbed(item: any) {
     .setColor(0x3498db)
     .setTimestamp(item.published ? new Date(item.published) : new Date());
 
-  const isHN = item.source === "Hacker News";
-  if (isHN) {
-    // HN: mostrar puntos/comentarios, no el snippet que es puro URL
-    const stats = [item.points ? `⬆️ ${item.points} pts` : "", item.comments ? `💬 ${item.comments}` : ""].filter(Boolean).join(" • ");
-    embed.setFooter({ text: `📰 Hacker News${stats ? ` • ${stats}` : ""}` });
-  } else {
-    if (item.summary) {
-      embed.setDescription(item.summary.substring(0, 400));
-    }
-    embed.setFooter({ text: `📰 ${item.source}${item.author ? ` • ✍️ ${item.author}` : ""}` });
+  // Descripción: si hay summary real la mostramos; si no (HN), mostramos
+  // los stats (puntos/comentarios) para mantener la estructura uniforme.
+  if (item.summary && !item.summary.startsWith("Article URL:")) {
+    embed.setDescription(item.summary.substring(0, 400));
+  } else if (item.points || item.comments) {
+    const stats = [item.points ? `⬆️ **${item.points}** puntos` : "", item.comments ? `💬 **${item.comments}** comentarios` : ""].filter(Boolean).join("\n");
+    if (stats) embed.setDescription(`📈 ${stats}`);
   }
+
+  // Footer uniforme: fuente + autor (si existe)
+  const footer = `📰 ${item.source}${item.author ? ` • ✍️ ${item.author}` : ""}`;
+  embed.setFooter({ text: footer.substring(0, 200) });
 
   if (item.image) {
     embed.setImage(item.image);

@@ -91,6 +91,25 @@ function stripHtml(html: string): string {
   return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
 
+// Limpia títulos con espacios/saltos raros (freeCodeCamp los trae sucios)
+function cleanTitle(title: string): string {
+  return title.replace(/\s+/g, " ").trim();
+}
+
+// Limpia el autor: quita emails ("hello@x.com (Nombre)") y espacios sucios
+function cleanAuthor(author: string | undefined): string | undefined {
+  if (!author) return undefined;
+  const clean = author.replace(/\s+/g, " ").trim();
+  if (!clean) return undefined;
+  // Si es un email (o contiene uno), quedarse con la parte entre paréntesis si existe
+  if (/@/.test(clean)) {
+    const paren = clean.match(/\(([^)]+)\)/);
+    if (paren && paren[1].trim()) return paren[1].trim();
+    return undefined;
+  }
+  return clean;
+}
+
 // Para Hacker News: extrae puntos y nº de comentarios del contenido
 function extractHnStats(html: string): { points?: number; comments?: number } {
   const points = html.match(/Points:\s*(\d+)/i);
@@ -115,12 +134,12 @@ export async function fetchNews(): Promise<NewsItem[]> {
           const isHN = source.name === "Hacker News";
           return {
             type: "news" as const,
-            title: item.title || "",
+            title: cleanTitle(item.title || ""),
             url: item.link || "",
             summary: snippet,
             image: extractImage(contentHtml, source.url),
             source: source.name,
-            author: item.creator || item.author || undefined,
+            author: cleanAuthor(item.creator || item.author),
             published: item.isoDate ? new Date(item.isoDate).getTime() : undefined,
             ...(isHN ? extractHnStats(contentHtml) : {}),
           };
